@@ -5,7 +5,7 @@ import cloudinary from "../config/CloudinaryConfig.js";
 // 🔹 Create Post with image upload
 export const createPost = async (req, res) => {
 	try {
-		const { title, content } = req.body;
+		const { title, content, category } = req.body;
 		const userId = req.user.id;
 
 		if (!title || !content) {
@@ -29,6 +29,7 @@ export const createPost = async (req, res) => {
 							const newPost = await Post.create({
 								title,
 								content,
+								category,
 								images: imageUrls,
 								author: userId,
 							});
@@ -44,6 +45,7 @@ export const createPost = async (req, res) => {
 			const newPost = await Post.create({
 				title,
 				content,
+				category,
 				images: [],
 				author: userId,
 			});
@@ -55,14 +57,16 @@ export const createPost = async (req, res) => {
 	}
 };
 
-// 🔹 Get All Posts (with pagination)
+// 🔹 Get All Posts (with optional category filter + pagination)
 export const getAllPosts = async (req, res) => {
 	try {
-		const { page = 1, limit = 10 } = req.query;
+		const { page = 1, limit = 10, category } = req.query;
 		const skip = (page - 1) * limit;
 
-		const total = await Post.countDocuments();
-		const posts = await Post.find()
+		const filter = category ? { category } : {};
+
+		const total = await Post.countDocuments(filter);
+		const posts = await Post.find(filter)
 			.skip(skip)
 			.limit(parseInt(limit))
 			.sort({ createdAt: -1 })
@@ -89,11 +93,11 @@ export const getPostById = async (req, res) => {
 	}
 };
 
-// 🔹 Update Post (including new image upload)
+// 🔹 Update Post (including category and image upload)
 export const updatePost = async (req, res) => {
 	try {
 		const { id } = req.params;
-		const { title, content } = req.body;
+		const { title, content, category } = req.body;
 
 		const post = await Post.findById(id);
 		if (!post) return res.status(404).json({ error: "Post not found" });
@@ -113,9 +117,11 @@ export const updatePost = async (req, res) => {
 							return res.status(500).json({ error: "Image upload failed" });
 						}
 						imageUrls.push(result.secure_url);
+
 						if (imageUrls.length === req.files.length) {
 							post.title = title || post.title;
 							post.content = content || post.content;
+							post.category = category || post.category;
 							post.images = imageUrls;
 							const updatedPost = await post.save();
 							res.json({ message: "Post updated", updatedPost });
@@ -129,6 +135,7 @@ export const updatePost = async (req, res) => {
 		} else {
 			post.title = title || post.title;
 			post.content = content || post.content;
+			post.category = category || post.category;
 			const updatedPost = await post.save();
 			res.json({ message: "Post updated", updatedPost });
 		}
